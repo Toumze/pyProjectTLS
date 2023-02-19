@@ -19,13 +19,28 @@ class WiresharkAnalysis:
         self.bpf_filter = bpf_filter
         self.keep_packets = keep_packets
         self.display_filter = display_filter
-        # storage client_ip sever_ip port ja3 ja3s
         self.list_get_infor = []
-        # self.cap = pyshark.LiveCapture(interface=self.interface, tshark_path=self.tshark_path,
-        #                              display_filter=self.display_filter)
+        self.cap = None
+
+    def pyshark_file_capture(self, file_rode, display_filter_):
+        """ 从文件读取数据
+
+        :param file_rode: 路径
+        :param display_filter_: 过滤规则
+        :return:
+        """
+        self.cap = pyshark.FileCapture(tshark_path=self.tshark_path, input_file=file_rode,
+                                       display_filter=display_filter_)
+
+    def pyshark_live_capture(self, display_filter_):
+        """实时监控接口数据
+
+        :param display_filter_: 过滤规则
+        :return:
+        """
         # 进入实时监听模式
         self.cap = pyshark.LiveCapture(tshark_path=self.tshark_path,
-                                       display_filter=self.display_filter)
+                                       display_filter=display_filter_)
         # 将监听数据进行保存
         self.cap.sniff(timeout=2)
 
@@ -64,7 +79,6 @@ class WiresharkAnalysis:
         'handshake_sig_hash_algs', 'handshake_sig_hash_hash', 'handshake_sig_hash_sig', 'handshake_type', 
         'handshake_version', 'has_field', 'layer_name', 'pretty_print', 'raw_mode', 'record', 
         'record_content_type', 'record_length', 'record_version']
-
         """
     def storage_tls_ja3(self, hh_type, source_ip, destination_ip, ja3_s_str, ja3_s):
         """storage_tls_ja3 in self.list_get_infor
@@ -188,6 +202,7 @@ if __name__ == "__main__":
                                    bpf_filter=None, keep_packets=True,
                                    display_filter="(tls.handshake.type == 1 or tls.handshake.type == 2) and ip.src != "
                                                   "127.0.0.1")
+    test_shark.pyshark_live_capture("(tls.handshake.type == 1 or tls.handshake.type == 2) and ip.src != 127.0.0.1")
     print("--init end--")
     test_shark.test_()
     print("----- end of test -----")
