@@ -1,4 +1,5 @@
 import pyshark
+import pid_name
 
 
 def binary_ans(values):
@@ -14,6 +15,14 @@ def binary_ans(values):
 
 class WiresharkAnalysis:
     def __init__(self, tshark_path, interface, bpf_filter, keep_packets, display_filter, ):
+        """
+
+        :param tshark_path:    tshark的安装地址
+        :param interface:      接口 [仅用于LiveCapture] 进行嗅探的网络接口。如果没有给出，使用可用的第一个接口。
+        :param bpf_filter:     捕获过滤器，过滤规则 [仅用于LiveCapture]
+        :param keep_packets:   使用结束是否保存
+        :param display_filter: 显示过滤器，过滤规则
+        """
         self.tshark_path = tshark_path
         self.interface = interface
         self.bpf_filter = bpf_filter
@@ -25,7 +34,7 @@ class WiresharkAnalysis:
     def pyshark_file_capture(self, file_rode, display_filter_):
         """ 从文件读取数据
 
-        :param file_rode: 路径
+        :param file_rode: 要读取文件的路径  例如 'test11.py.pcap'
         :param display_filter_: 过滤规则
         :return:
         """
@@ -42,44 +51,8 @@ class WiresharkAnalysis:
         self.cap = pyshark.LiveCapture(tshark_path=self.tshark_path,
                                        display_filter=display_filter_)
         # 将监听数据进行保存
-        self.cap.sniff(timeout=2)
+        self.cap.sniff(timeout=5)
 
-        """
-        ['', '__class__', '__delattr__', '__dir__', '__doc__', '__eq__', 
-        '__format__', '__ge__', '__getattr__', '__getattribute__', '__getstate__', 
-        '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', 
-        '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', 
-        '__setattr__', '__setstate__', '__sizeof__', '__slots__', '__str__', '__subclasshook__', 
-        '_all_fields', '_field_prefix', '_get_all_field_lines', '_get_all_fields_with_alternates', 
-        '_get_field_or_layer_repr', '_get_field_repr', '_layer_name', '_pretty_print_layer_fields', 
-        '_sanitize_field_name', 'compress_certificate_algorithm', 
-        'compress_certificate_algorithms_length', 'extension_psk_ke_mode', 
-        'extension_psk_ke_modes_length', 'field_names', 'get', 'get_field', 
-        'get_field_by_showname', 'get_field_value', 'handshake', 'handshake_cipher_suites_length', 
-        'handshake_ciphersuite', 'handshake_ciphersuites', 'handshake_comp_method', 'handshake_comp_methods', 
-        'handshake_comp_methods_length', 'handshake_extension_data', 'handshake_extension_len', 
-        'handshake_extension_type', 'handshake_extensions_alpn_len', 'handshake_extensions_alpn_list', 
-        'handshake_extensions_alpn_str', 'handshake_extensions_alpn_str_len', 
-        'handshake_extensions_alps_alpn_list', 'handshake_extensions_alps_alpn_str', 
-        'handshake_extensions_alps_alpn_str_len', 'handshake_extensions_alps_len', 
-        'handshake_extensions_ec_point_format', 'handshake_extensions_ec_point_formats', 
-        'handshake_extensions_ec_point_formats_length', 'handshake_extensions_key_share_client_length', 
-        'handshake_extensions_key_share_group', 'handshake_extensions_key_share_key_exchange', 
-        'handshake_extensions_key_share_key_exchange_length', 'handshake_extensions_length', 
-        'handshake_extensions_padding_data', 'handshake_extensions_reneg_info_len', 
-        'handshake_extensions_server_name', 'handshake_extensions_server_name_len', 
-        'handshake_extensions_server_name_list_len', 'handshake_extensions_server_name_type', 
-        'handshake_extensions_status_request_exts_len', 'handshake_extensions_status_request_responder_ids_len', 
-        'handshake_extensions_status_request_type', 'handshake_extensions_supported_group', 
-        'handshake_extensions_supported_groups', 'handshake_extensions_supported_groups_length', 
-        'handshake_extensions_supported_version', 'handshake_extensions_supported_versions_len', 
-        'handshake_ja3', 'handshake_ja3_full', 'handshake_length', 'handshake_random', 
-        'handshake_random_bytes', 'handshake_random_time', 'handshake_session_id', 
-        'handshake_session_id_length', 'handshake_sig_hash_alg', 'handshake_sig_hash_alg_len', 
-        'handshake_sig_hash_algs', 'handshake_sig_hash_hash', 'handshake_sig_hash_sig', 'handshake_type', 
-        'handshake_version', 'has_field', 'layer_name', 'pretty_print', 'raw_mode', 'record', 
-        'record_content_type', 'record_length', 'record_version']
-        """
     def storage_tls_ja3(self, hh_type, source_ip, destination_ip, ja3_s_str, ja3_s):
         """storage_tls_ja3 in self.list_get_infor
         storage client_ip sever_ip port ja3 ja3s
@@ -92,13 +65,13 @@ class WiresharkAnalysis:
         :return: True right , False error
         """
 
-        if hh_type != "1" and hh_type != "2":   # 传入包 错误，不是 hello包 直接退出
+        if hh_type != "1" and hh_type != "2":  # 传入包 错误，不是 hello包 直接退出
             print("--hh_type != 1 / 2: error--")
             return False
 
         client_ip = ''
         sever_ip = ''
-        if hh_type == "1":   # 将客户 IP 与服务器 IP进行分离
+        if hh_type == "1":  # 将客户 IP 与服务器 IP进行分离
             client_ip = source_ip
             sever_ip = destination_ip
         elif hh_type == "2":
@@ -106,9 +79,9 @@ class WiresharkAnalysis:
             sever_ip = source_ip
 
         for tmp in self.list_get_infor:
-            if tmp["client_ip"] == client_ip and tmp["sever_ip"] == sever_ip:    # 本 ja3 曾经保存过
+            if tmp["client_ip"] == client_ip and tmp["sever_ip"] == sever_ip:  # 本 ja3 曾经保存过
                 print("搜索过了")
-                if hh_type == "1":     # 发现， 并添加到 ja3 中，以字典格式 {ja3：ja3str}
+                if hh_type == "1":  # 发现， 并添加到 ja3 中，以字典格式 {ja3：ja3str}
                     if ja3_s in tmp["ja3"].keys():
                         pass
                     else:
@@ -132,8 +105,29 @@ class WiresharkAnalysis:
         self.list_get_infor.append(dic)
         return True
 
+    def count_file_ja3(self):
+        ja3_dict = {}
+
+        for tmp_packet in self.cap:
+            if "tls" not in tmp_packet:   # 如果没有 tls 层
+                continue
+            if tmp_packet.tls.handshake_type == "1":  # client hello
+                ja3 = tmp_packet.tls.handshake_ja3_full
+                if ja3 in ja3_dict.keys():     # 如果该指纹已经存在
+                    ja3_dict[ja3] = ja3_dict[ja3] + 1  # 自增一
+                else:
+                    ja3_dict[ja3] = 1
+        for i in ja3_dict:
+            print(i)
+            print(ja3_dict[i])
+            print()
+
+
+
+
     def test_(self):
         print("num of cap: ", len(self.cap))
+
         count = 0
         for tmp_packet in self.cap:
             print("NO.", count)
@@ -143,27 +137,39 @@ class WiresharkAnalysis:
             print("源地址  : ", tmp_packet.ip.src)
             print("目的地址: ", tmp_packet.ip.dst)
             # print(dir(tmp_packet))
-            print("layers", tmp_packet.layers)
+            print("layers", tmp_packet.layers)  # 查看都有哪些层
 
-            if "tls" not in tmp_packet:
+            if "tls" not in tmp_packet:  # 如果没有tls层 跳过
                 print("not have tls")
                 # print(tmp_packet)
                 continue
 
             if "tcp" in tmp_packet:
-                print("tcp端口: ", tmp_packet.tcp.port)
+                pass
             else:
                 print("not tcp")
                 continue
 
             # print(tmp_packet.tls)
             print(tmp_packet.tls.handshake_type)
-            if tmp_packet.tls.handshake_type == "1":       # ja3 client hello
+            if tmp_packet.tls.handshake_type == "1":  # ja3 client hello
                 print("JA3", tmp_packet.tls.handshake_ja3)
                 print("JA3 Full string", tmp_packet.tls.handshake_ja3_full)
+                # ------
+                port_tcp = tmp_packet.tcp.srcport
+                print("tcp端口: ", tmp_packet.tcp.port)
+                print("tcp dstport", tmp_packet.tcp.dstport)
+                print("tcp srcport", tmp_packet.tcp.srcport)
+                pid_port = pid_name.port_pid(port_tcp)
+                if pid_port is not None:
+                    print("pid:", pid_port)
+                    print("name:", pid_name.pid_name(pid_port))
+                else:
+                    print("未找到对应的pid")
+                # ------
                 self.storage_tls_ja3(tmp_packet.tls.handshake_type, tmp_packet.ip.src, tmp_packet.ip.dst,
                                      tmp_packet.tls.handshake_ja3_full, tmp_packet.tls.handshake_ja3)
-            elif tmp_packet.tls.handshake_type == "2":     # ja3 sever hello
+            elif tmp_packet.tls.handshake_type == "2":  # ja3 sever hello
                 print("JA3S", tmp_packet.tls.handshake_ja3s)
                 print("JA3S Full string", tmp_packet.tls.handshake_ja3s_full)
                 self.storage_tls_ja3(tmp_packet.tls.handshake_type, tmp_packet.ip.src, tmp_packet.ip.dst,
@@ -174,7 +180,7 @@ class WiresharkAnalysis:
             print(i)
 
     def print_ans(self):
-        """print test information
+        """print test11.py information
 
         :return:
         """
@@ -196,8 +202,8 @@ class WiresharkAnalysis:
 
 
 if __name__ == "__main__":
-    print("----- begin the test -----")
-    print("--init--")
+    print("----- begin the test11.py -----")
+
     test_shark = WiresharkAnalysis(tshark_path="D:\\software\\Wireshark\\tshark.exe", interface=None,
                                    bpf_filter=None, keep_packets=True,
                                    display_filter="(tls.handshake.type == 1 or tls.handshake.type == 2) and ip.src != "
@@ -205,4 +211,4 @@ if __name__ == "__main__":
     test_shark.pyshark_live_capture("(tls.handshake.type == 1 or tls.handshake.type == 2) and ip.src != 127.0.0.1")
     print("--init end--")
     test_shark.test_()
-    print("----- end of test -----")
+    print("----- end of test11.py -----")
