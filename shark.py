@@ -121,6 +121,7 @@ class WiresharkAnalysis:
             print(i)
             print(ja3_dict[i])
             print()
+        return ja3_dict
 
 
 

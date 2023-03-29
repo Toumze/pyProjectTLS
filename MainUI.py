@@ -2,6 +2,8 @@ import sys
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import *
+import shark
+import time
 
 
 class MainUI(QWidget):
@@ -13,34 +15,97 @@ class MainUI(QWidget):
         self.display_filter = None
         self.file_rode = None
         self.choice_function = None
+        self.shark = None
+        self.window_width = 800
+        self.window_height = 600
         self.setWindowTitle("TLS指纹分析")
-        self.resize(800, 600)
+
+        self.resize(self.window_width, self.window_height)
+        self.setMinimumWidth(self.window_width)  # 设置最小窗口大小
+        self.setMinimumHeight(self.window_height)
+        print(self.width(), self.height())
 
         # 选择 tshark.exe
-        self.label_pyshark = QLabel(self)
-        self.label_pyshark.setGeometry(QtCore.QRect(10, 30, 75, 23))
-        self.label_pyshark.setText("tshark：")
-        self.lineEdit_pyshark = QLineEdit(self)
-        self.lineEdit_pyshark.setGeometry(QtCore.QRect(100, 30, 180, 23))
-        self.lineEdit_pyshark.setText("D:\\software\\Wireshark\\tshark.exe")
-        self.button_open_pyshark = QPushButton(self)
-        self.button_open_pyshark.setGeometry(QtCore.QRect(300, 30, 75, 23))
-        self.button_open_pyshark.setText("选择")
-        self.button_open_pyshark.clicked.connect(self.choose_tshark)
+        self.label_tshark = QLabel(self)
+        self.label_tshark.setGeometry(QtCore.QRect(30, 30, 75, 23))
+        self.label_tshark.setText("tshark：")
+        self.lineEdit_tshark = QLineEdit(self)
+        self.lineEdit_tshark.setGeometry(QtCore.QRect(130, 30, 180, 23))
+        self.lineEdit_tshark.setText("D:\\software\\Wireshark\\tshark.exe")
+        self.button_open_tshark = QPushButton(self)
+        self.button_open_tshark.setGeometry(QtCore.QRect(330, 30, 75, 23))
+        self.button_open_tshark.setText("选择")
+        self.button_open_tshark.clicked.connect(self.choose_tshark)
 
         # 选择活动接口读取
         self.button_live_capture = QPushButton(self)
-        self.button_live_capture.setGeometry(QtCore.QRect(150, 100, 80, 25))
+        self.button_live_capture.setGeometry(QtCore.QRect(40, 100, 80, 25))
         self.button_live_capture.setText("接口读取")
         self.button_live_capture.clicked.connect(self.choose_live_capture)
+        self.lineEdit_live_interface = QLineEdit(self)
+        self.lineEdit_live_interface.setGeometry(QtCore.QRect(130, 100, 200, 25))
 
         # 选择文件读取
         self.button_file_capture = QPushButton(self)
-        self.button_file_capture.setGeometry(QtCore.QRect(600, 100, 80, 25))
+        self.button_file_capture.setGeometry(QtCore.QRect(400, 100, 80, 25))
         self.button_file_capture.setText("文件读取")
         self.button_file_capture.clicked.connect(self.choose_file_capture)
         self.lineEdit_file_capture = QLineEdit(self)
-        self.lineEdit_file_capture.setGeometry(QtCore.QRect(380, 100, 200, 25))
+        self.lineEdit_file_capture.setGeometry(QtCore.QRect(490, 100, 200, 25))
+
+        # 过滤规则
+        self.label_display_filter = QLabel(self)
+        self.label_display_filter.setGeometry(QtCore.QRect(40, 170, 90, 25))
+        self.label_display_filter.setText("过滤规则:")
+        self.lineEdit_display_filter = QLineEdit(self)
+        self.lineEdit_display_filter.setGeometry(QtCore.QRect(130, 170, 200, 25))
+
+        # 分割线
+
+        # 确认按钮
+        self.button_begin = QPushButton(self)
+        self.button_begin.setGeometry(QtCore.QRect(500, 155, 120, 45))
+        self.button_begin.setText("开始")
+        self.button_begin.clicked.connect(self.begin)
+
+        # 显示区域
+        self.comboBox_overall = QComboBox(self)
+        self.comboBox_overall.setGeometry(QtCore.QRect(40, 210, 720, 80))
+
+        self.comboBox = QComboBox(self)
+        self.comboBox.setGeometry(QtCore.QRect(40, 300, 720, 250))
+
+    def resizeEvent(self, a0) -> None:
+        self.window_height = a0.size().height()
+        self.window_width = a0.size().width()
+        self.reprint()
+
+    def reprint(self):
+        change = self.window_width * 1.0 / 800
+
+        # 位置 tshark.exe
+        self.label_tshark.setGeometry(QtCore.QRect(int(change * 40), 30, 75, 23))
+        self.lineEdit_tshark.setGeometry(QtCore.QRect(int(change * 40) + 65, 30, 180, 23))
+        self.button_open_tshark.setGeometry(QtCore.QRect(int(change * 40) + 215 + 40, 30, 75, 23))
+
+        # 位置 活动接口读取
+        self.button_live_capture.setGeometry(QtCore.QRect(int(change * 40), 100, 80, 25))
+        self.lineEdit_live_interface.setGeometry(QtCore.QRect(int(change * 40) + 90, 100, 200, 25))
+
+        # 位置 选择文件读取
+        self.button_file_capture.setGeometry(QtCore.QRect(int(change * 400), 100, 80, 25))
+        self.lineEdit_file_capture.setGeometry(QtCore.QRect(int(change * 400) + 90, 100, 200, 25))
+
+        # 位置 过滤规则
+        self.label_display_filter.setGeometry(QtCore.QRect(int(change * 40), 170, 90, 25))
+        self.lineEdit_display_filter.setGeometry(QtCore.QRect(int(change * 40) + 100, 170, 200, 25))
+
+        # 位置 确认按钮
+        self.button_begin.setGeometry(QtCore.QRect(int(change * 500), 155, 120, 45))
+
+        # 显示区域
+        self.comboBox_overall.setGeometry(QtCore.QRect(40, 210, self.window_width - 80, 80))
+        self.comboBox.setGeometry(QtCore.QRect(40, 300, self.window_width - 80, self.window_height - 350))
 
     def choose_tshark(self):
         """
@@ -48,8 +113,8 @@ class MainUI(QWidget):
         :return: None
         """
         folder_path = QFileDialog.getOpenFileName(self, "选择tshark路径")[0]
-        self.lineEdit_pyshark.clear()
-        self.lineEdit_pyshark.setText(folder_path)
+        self.lineEdit_tshark.clear()
+        self.lineEdit_tshark.setText(folder_path)
 
     def choose_live_capture(self):
         """
@@ -66,7 +131,38 @@ class MainUI(QWidget):
         folder_path = QFileDialog.getOpenFileName(self, "选择pcap路径")[0]
         self.lineEdit_file_capture.clear()
         self.lineEdit_file_capture.setText(folder_path)
-        self.choice_function = "file_captur"
+        self.choice_function = "file_capture"
+
+    def begin(self):
+        self.button_begin.setEnabled(False)  # 设置按钮失效
+        self.button_begin.setStyleSheet('''QPushButton{background:#D3D3D3}''')
+        time.sleep(0.1)
+        self.tshark_path = self.lineEdit_tshark.text()
+        self.display_filter = self.lineEdit_display_filter.text()
+        self.interface = self.lineEdit_live_interface.text()
+        self.file_rode = self.lineEdit_file_capture.text()
+
+        self.shark = shark.WiresharkAnalysis(tshark_path=self.tshark_path, display_filter=self.display_filter,
+                                             interface=None, bpf_filter=None, keep_packets=True, )
+
+        if self.choice_function == "live_capture":
+            self.shark.pyshark_live_capture(display_filter_=self.display_filter)
+        elif self.choice_function == "file_capture":
+            self.shark.pyshark_file_capture(file_rode=self.file_rode, display_filter_=self.display_filter)
+            ja3_dict = self.shark.count_file_ja3()
+            self.repaint_table(ja3_dict)
+
+        else:
+            pass
+        self.button_begin.setStyleSheet('''QPushButton{background:#FFFFFF}''')
+        self.button_begin.setEnabled(True)
+
+    def repaint_table(self, ja3_dict):
+        """
+        输出获得的 TLS 指纹
+        :return: None
+        """
+
 
 
 if __name__ == '__main__':
