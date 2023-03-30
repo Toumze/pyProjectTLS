@@ -117,14 +117,31 @@ class WiresharkAnalysis:
                     ja3_dict[ja3] = ja3_dict[ja3] + 1  # 自增一
                 else:
                     ja3_dict[ja3] = 1
+        """
         for i in ja3_dict:
             print(i)
             print(ja3_dict[i])
             print()
+        """
         return ja3_dict
 
+    def information_(self):
+        """
+        返回本次数据流相关信息
+        :return: 一个字典information =
+        {"TLS count": 0, "TCP count": 0, "all count": 0, "all Length": 0, "TLS Length": 0}
+        """
+        information = {"TLS count": 0, "TCP count": 0, "all count": 0, "all Length": 0, "TLS Length": 0}
 
-
+        for tmp_packet in self.cap:
+            information["all count"] += 1
+            information["all Length"] += int(tmp_packet.length)
+            if 'tcp' in tmp_packet:
+                information["TCP count"] += 1
+                if 'TLS' in tmp_packet:
+                    information["TLS count"] += 1
+                    information["TLS Length"] += int(tmp_packet.length)
+        return information
 
     def test_(self):
         print("num of cap: ", len(self.cap))
