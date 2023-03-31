@@ -109,14 +109,20 @@ class WiresharkAnalysis:
         ja3_dict = {}
 
         for tmp_packet in self.cap:
-            if "tls" not in tmp_packet:   # 如果没有 tls 层
-                continue
-            if tmp_packet.tls.handshake_type == "1":  # client hello
-                ja3 = tmp_packet.tls.handshake_ja3_full
-                if ja3 in ja3_dict.keys():     # 如果该指纹已经存在
-                    ja3_dict[ja3] = ja3_dict[ja3] + 1  # 自增一
-                else:
-                    ja3_dict[ja3] = 1
+            try:
+                if "tls" in tmp_packet.__dir__() and "record" in tmp_packet.tls.__dir__() \
+                        and 'Client Hello' in tmp_packet.tls.record:  # client hello
+                    ja3 = tmp_packet.tls.handshake_ja3_full
+                    if ja3 in ja3_dict.keys():  # 如果该指纹已经存在
+                        ja3_dict[ja3] = ja3_dict[ja3] + 1  # 自增一
+                    else:
+                        ja3_dict[ja3] = 1
+            except AttributeError:
+                print("-----------error------------")
+                print("shark.WiresharkAnalysis.count_file_ja3")
+                print("tmp_packet.tls", tmp_packet.tls)
+                print("----------------------------")
+                print()
         """
         for i in ja3_dict:
             print(i)
@@ -176,8 +182,8 @@ class WiresharkAnalysis:
                 # ------
                 port_tcp = tmp_packet.tcp.srcport
                 print("tcp端口: ", tmp_packet.tcp.port)
-                print("tcp dstport", tmp_packet.tcp.dstport)
-                print("tcp srcport", tmp_packet.tcp.srcport)
+                print("tcp dst port", tmp_packet.tcp.dstport)
+                print("tcp src port", tmp_packet.tcp.srcport)
                 pid_port = pid_name.port_pid(port_tcp)
                 if pid_port is not None:
                     print("pid:", pid_port)
@@ -217,6 +223,9 @@ class WiresharkAnalysis:
             print(tmp_packet.tls)
 
             print("\n\n")
+
+    def close(self):
+        self.cap.close()
 
 
 if __name__ == "__main__":
