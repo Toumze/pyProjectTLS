@@ -1,9 +1,11 @@
+import os.path
 import sys
-
-import xlwt
 import openpyxl
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import *
+from pyshark.tshark.tshark import TSharkNotFoundException
+
 import shark
 import time
 
@@ -20,7 +22,9 @@ class MainUI(QWidget):
         self.shark = None
         self.window_width = 800
         self.window_height = 600
+
         self.setWindowTitle("TLS指纹分析")
+        self.setWindowIcon(QIcon('printing.png'))
 
         self.resize(self.window_width, self.window_height)
         self.setMinimumWidth(self.window_width)  # 设置最小窗口大小
@@ -74,6 +78,18 @@ class MainUI(QWidget):
         self.button_save_excel.setText("导出")
         self.button_save_excel.clicked.connect(self.save_excel)
 
+        try:
+            self.tshark_path = self.lineEdit_tshark.text()
+            self.shark = shark.WiresharkAnalysis(tshark_path=self.tshark_path, interface=None, bpf_filter=None,
+                                                 keep_packets=True, display_filter=self.display_filter)
+            items = self.shark.get_interface()
+            print(items)
+
+            self.comboBox_live_interface.addItems(item for item in items if '\\' not in item)
+
+        except TSharkNotFoundException:
+            print("error --------tshark no found---------")
+
     def resizeEvent(self, a0) -> None:
         self.window_height = a0.size().height()
         self.window_width = a0.size().width()
@@ -118,6 +134,16 @@ class MainUI(QWidget):
         folder_path = QFileDialog.getOpenFileName(self, "选择tshark路径")[0]
         self.lineEdit_tshark.clear()
         self.lineEdit_tshark.setText(folder_path)
+        self.tshark_path = folder_path
+        try:
+            self.tshark_path = self.lineEdit_tshark.text()
+            self.shark = shark.WiresharkAnalysis(tshark_path=self.tshark_path, interface=None, bpf_filter=None,
+                                                 keep_packets=True, display_filter=self.display_filter)
+            items = self.shark.get_interface()
+            self.comboBox_live_interface.addItems(item for item in items if '\\' not in item)
+
+        except TSharkNotFoundException:
+            print("error --------tshark no found---------")
 
     def choose_live_capture(self):
         """
@@ -144,18 +170,23 @@ class MainUI(QWidget):
         self.display_filter = self.lineEdit_display_filter.text()
         self.interface = self.comboBox_live_interface.currentText()
         self.file_rode = self.lineEdit_file_capture.text()
-        if self.shark is not None:
-            self.shark.close()
-        self.shark = shark.WiresharkAnalysis(tshark_path=self.tshark_path, interface=None, bpf_filter=None,
-                                             keep_packets=True, display_filter=self.display_filter)
+
         if self.choice_function == "live_capture":
-            self.shark.pyshark_live_capture(display_filter_=self.display_filter)
+            self.shark.pyshark_live_capture(interface_=self.interface, display_filter_=self.display_filter)
+            ja3_dict, infor = self.shark.count_live_ja3()
+            print("begin --- reprint")
+            self.repaint_table(ja3_dict)
+            self.repaint_table_overall(infor)
+            print("reprint ---- ja3 --- live-----")
+            self.repaint_table(ja3_dict)
+            self.shark.close()
         elif self.choice_function == "file_capture":
             self.shark.pyshark_file_capture(file_rode=self.file_rode, display_filter_=self.display_filter)
             ja3_dict = self.shark.count_file_ja3()
             self.repaint_table(ja3_dict)
             infor = self.shark.information_()
             self.repaint_table_overall(infor)
+            self.shark.close()
         else:
             pass
         self.button_begin.setStyleSheet('''QPushButton{background:#FFFFFF}''')
@@ -167,9 +198,11 @@ class MainUI(QWidget):
         :param ja3_dict: dict
         :return: None
         """
+        header = ['count', 'Version', 'Ciphers', 'Extensions', 'EllipticCurves', 'EllipticCurvePointFormats']
         self.tableWidget.clear()
         self.tableWidget.setRowCount(len(ja3_dict))
         self.tableWidget.setColumnCount(6)
+        self.tableWidget.setHorizontalHeaderLabels(header)
         self.tableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         num_row = 0
         for item in ja3_dict:
@@ -200,20 +233,42 @@ class MainUI(QWidget):
         保存全部情况 和 TLS指纹
         :return: None
         """
-        workbook = openpyxl.Workbook()
-        over_all_sheet = workbook.active
-        over_all_sheet.title = "OverAllSheet"
-        for col in range(1, self.tableWidget_overall.columnCount() + 1):
-            over_all_sheet.cell(1, col, self.tableWidget_overall.horizontalHeaderItem(col - 1).text())
-        for col in range(1, self.tableWidget_overall.columnCount() + 1):
-            over_all_sheet.cell(2, col, self.tableWidget_overall.item(0, col - 1).text())
+        file_name, file_type = QFileDialog.getSaveFileName(self, 'save file', './', "Excel files(*.xlsx)")
+        print(file_name, " ", file_type)
+        if os.path.exists(file_name):
+            workbook = openpyxl.load_workbook(file_name)
+            sheet_names = workbook.sheetnames
+            print(sheet_names)
+            if 'OverAllSheet' in sheet_names:
+                over_all_sheet = workbook['OverAllSheet']
+            else:
+                over_all_sheet = workbook.create_sheet("OverAllSheet")
+            if 'TLS Sheet' in sheet_names:
+                tls_sheet = workbook['TLS Sheet']
+            else:
+                tls_sheet = workbook.create_sheet("TLS Sheet")
+        else:
+            workbook = openpyxl.Workbook()
+            over_all_sheet = workbook.active
+            over_all_sheet.title = "OverAllSheet"
+            tls_sheet = workbook.create_sheet("TLS Sheet")
 
-        tls_sheet = workbook.create_sheet("TLS Sheet")
+        if not os.path.exists(file_name):
+            over_all_row = 0
+            tls_row = 0
+            for col in range(1, self.tableWidget_overall.columnCount() + 1):
+                over_all_sheet.cell(1, col, self.tableWidget_overall.horizontalHeaderItem(col - 1).text())
+        else:
+            over_all_row = over_all_sheet.max_row
+            tls_row = tls_sheet.max_row
+
+        for col in range(1, self.tableWidget_overall.columnCount() + 1):
+            over_all_sheet.cell(over_all_row + 1, col, self.tableWidget_overall.item(0, col - 1).text())
+
         for row in range(1, self.tableWidget.rowCount() + 1):
             for col in range(1, self.tableWidget.columnCount() + 1):
-                tls_sheet.cell(row, col, self.tableWidget.item(row - 1, col - 1).text())
+                tls_sheet.cell(tls_row + row, col, self.tableWidget.item(row - 1, col - 1).text())
         try:
-            file_name, file_type = QFileDialog.getSaveFileName(self, 'save file', './', "Excel files(*.xlsx)")
             workbook.save(file_name)
             QMessageBox.about(self, "提示", "保存成功!     ")
         except IOError:
@@ -231,7 +286,6 @@ class MainUI(QWidget):
         self.tableWidget.setRowCount(1)
         self.tableWidget.setColumnCount(6)
         num_row = 0
-        num_col = 0
         self.tableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tableWidget.setColumnWidth(0, 30)
         self.tableWidget.setColumnWidth(1, 40)

@@ -1,5 +1,6 @@
 import pyshark
 import pid_name
+from pyshark.tshark.tshark import get_all_tshark_interfaces_names
 
 
 def binary_ans(values):
@@ -39,19 +40,21 @@ class WiresharkAnalysis:
         :return:
         """
         self.cap = pyshark.FileCapture(tshark_path=self.tshark_path, input_file=file_rode,
-                                       display_filter=display_filter_)
+                                       display_filter=display_filter_, keep_packets=False)
 
-    def pyshark_live_capture(self, display_filter_):
+    def pyshark_live_capture(self, interface_, display_filter_):
         """实时监控接口数据
 
+        :param interface_: 接口
         :param display_filter_: 过滤规则
         :return:
         """
         # 进入实时监听模式
-        self.cap = pyshark.LiveCapture(tshark_path=self.tshark_path,
+        self.cap = pyshark.LiveCapture(interface=interface_,
+                                       tshark_path=self.tshark_path,
                                        display_filter=display_filter_)
         # 将监听数据进行保存
-        self.cap.sniff(timeout=5)
+        self.cap.sniff(packet_count=2000)
 
     def storage_tls_ja3(self, hh_type, source_ip, destination_ip, ja3_s_str, ja3_s):
         """storage_tls_ja3 in self.list_get_infor
@@ -123,30 +126,77 @@ class WiresharkAnalysis:
                 print("tmp_packet.tls", tmp_packet.tls)
                 print("----------------------------")
                 print()
-        """
-        for i in ja3_dict:
-            print(i)
-            print(ja3_dict[i])
-            print()
-        """
+
         return ja3_dict
 
-    def information_(self):
-        """
-        返回本次数据流相关信息
-        :return: 一个字典information =
-        {"TLS count": 0, "TCP count": 0, "all count": 0, "all Length": 0, "TLS Length": 0}
-        """
+    def count_live_ja3(self):
+        ja3_dict = {}
         information = {"TLS count": 0, "TCP count": 0, "all count": 0, "all Length": 0, "TLS Length": 0}
 
         for tmp_packet in self.cap:
             information["all count"] += 1
             information["all Length"] += int(tmp_packet.length)
-            if 'tcp' in tmp_packet:
+            if 'tcp' in tmp_packet.__dir__():
                 information["TCP count"] += 1
-                if 'TLS' in tmp_packet:
+            try:
+                if "tls" in tmp_packet.__dir__():
                     information["TLS count"] += 1
                     information["TLS Length"] += int(tmp_packet.length)
+                if "tls" in tmp_packet.__dir__() and "record" in tmp_packet.tls.__dir__() \
+                        and 'Client Hello' in tmp_packet.tls.record:  # client hello
+                    ja3 = tmp_packet.tls.handshake_ja3_full
+                    if ja3 in ja3_dict.keys():  # 如果该指纹已经存在
+                        ja3_dict[ja3] = ja3_dict[ja3] + 1  # 自增一
+                    else:
+                        ja3_dict[ja3] = 1
+            except AttributeError:
+                print("-----------error------------")
+                print("shark.WiresharkAnalysis.count_live_ja3")
+                print("tmp_packet.tls", tmp_packet.tls)
+                print("----------------------------")
+                print()
+
+        return ja3_dict, information
+
+    def information_(self):
+        """
+        返回本次数据流相关信息
+        :return: 一个字典information =
+        {"TLS count": 0, "TCP count": 0, "all count": 0, "all Length": 0, "TLS Length": 0,
+        "TLS 1.0": 0, "TLS 1.1": 0, "TLS 1.2": 0}}
+        """
+        information = {"TLS count": 0, "TCP count": 0, "all count": 0, "all Length": 0, "TLS Length": 0,
+                       "TLS 1.0": 0, "TLS 1.1": 0, "TLS 1.2": 0, "TLS 1.3": 0}
+
+        for tmp_packet in self.cap:
+            information["all count"] += 1
+            information["all Length"] += int(tmp_packet.length)
+            if 'tcp' in tmp_packet.__dir__():
+                information["TCP count"] += 1
+                if "tls" in tmp_packet.__dir__() and "record" in tmp_packet.tls.__dir__() \
+                        and 'Client Hello' in tmp_packet.tls.record:  # client hello:
+                    information["TLS count"] += 1
+                    information["TLS Length"] += int(tmp_packet.length)
+                    if tmp_packet.tls.handshake_version == "0x0301":  # 1.0
+                        information["TLS 1.0"] += 1
+                    elif tmp_packet.tls.handshake_version == "0x0302":  # 1.1
+                        information["TLS 1.1"] += 1
+                    elif tmp_packet.tls.handshake_version == "0x0303":  # 1.2 or 1.3
+                        flag = True
+                        for typ in tmp_packet.tls.handshake_extension_type.all_fields:
+                            if "supported_versions" in typ.showname_value:   # 有扩展 versions
+                                flag = False
+                                for vision in tmp_packet.tls.handshake_extensions_supported_version.all_fields:
+                                    if "TLS 1.3" in vision.showname_value:
+                                        information["TLS 1.3"] += 1
+                                        break
+                                    elif "TLS 1.2" in vision.showname_value:
+                                        information["TLS 1.2"] += 1
+                                        break
+                                break  # 跳出循环结束
+                        if flag:   # 如果没有触发过循环查找 扩展versions 则是 tls 1.2
+                            information["TLS 1.2"] += 1
+
         return information
 
     def test_(self):
@@ -226,6 +276,10 @@ class WiresharkAnalysis:
 
     def close(self):
         self.cap.close()
+
+    def get_interface(self):
+        all_interfaces = get_all_tshark_interfaces_names(self.tshark_path)
+        return all_interfaces
 
 
 if __name__ == "__main__":
